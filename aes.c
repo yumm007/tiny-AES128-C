@@ -496,10 +496,10 @@ static void XorWithIv(uint8_t* buf)
   }
 }
 
-void AES128_CBC_encrypt_buffer(uint8_t* output, uint8_t* input, uint32_t length, const uint8_t* key, const uint8_t* iv)
+int AES128_CBC_encrypt_buffer(uint8_t* output, uint8_t* input, uint32_t length, const uint8_t* key, const uint8_t* iv)
 {
-  uintptr_t i;
-  uint8_t remainders = length % KEYLEN; /* Remaining bytes in the last non-full block */
+  int i;
+  uint8_t remainders = KEYLEN - length % KEYLEN; /* Remaining bytes in the last non-full block */
 
   BlockCopy(output, input);
   state = (state_t*)output;
@@ -516,7 +516,7 @@ void AES128_CBC_encrypt_buffer(uint8_t* output, uint8_t* input, uint32_t length,
     Iv = (uint8_t*)iv;
   }
 
-  for(i = 0; i < length; i += KEYLEN)
+  for(i = length / KEYLEN -1; i >= 0; i--)
   {
     XorWithIv(input);
     BlockCopy(output, input);
@@ -530,10 +530,13 @@ void AES128_CBC_encrypt_buffer(uint8_t* output, uint8_t* input, uint32_t length,
   if(remainders)
   {
     BlockCopy(output, input);
-    memset(output + remainders, 0, KEYLEN - remainders); /* add 0-padding */
+    memset(output + length % KEYLEN, remainders, remainders); /* PKCS5 http://www.di-mgt.com.au/cryptopad.html */
+    XorWithIv(output);
     state = (state_t*)output;
     Cipher();
   }
+
+  return length + remainders;
 }
 
 void AES128_CBC_decrypt_buffer(uint8_t* output, uint8_t* input, uint32_t length, const uint8_t* key, const uint8_t* iv)
